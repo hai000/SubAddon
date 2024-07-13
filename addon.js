@@ -66,7 +66,7 @@ builder.defineSubtitlesHandler(async function (args) {
 		if(config.apikey != undefined&& apikeyremaining!== false){
 			if(imdbid !== null){// if imdbid is not null
 				const subs = await foundSubtitles(type, imdbid,season,episode,iso692);
-				console.log("subs:" + subs)
+				// console.log("subs:" + subs)
 				if(subs!=null&&subs.length>0){// if not found subtitles with your language
 					if (
 						(await checkAndTranslatingAPI(
@@ -259,7 +259,7 @@ async function foundSubtitles(type, imdbid,season,episode,iso692) {
 			 subtitles = response.data.subs
 				.filter(subtitle => subtitle.lang === 'Vietnamese')
 				.map(subtitle => subtitle.subId);
-			 if (subtitles.length>0&&false) {// mac dinh la sai
+			 if (subtitles.length>0) {// mac dinh la sai
 				 console.log("co subtitles vn")
 				 return null;
 			 }
@@ -325,6 +325,7 @@ async function fetchSubtitles(
 	if (oldisocode === undefined) {
 	  oldisocode = langcode;
 	}
+	//http://127.0.0.1:55697/
 	if (type === "movie") {
 	  for (let i = 1; i <= count; i++) {
 		const subtitle = {
@@ -337,6 +338,7 @@ async function fetchSubtitles(
 	} else {
 	  for (let i = 1; i <= count; i++) {
 		const subtitle = {
+
 		  id: `${imdbid}-${season}-${episode}subtitle-${i}`,
 		  url: `https://subaddon.onrender.com/subtitles/${oldisocode}/${imdbid}/season${season}/${imdbid}-translated-${episode}-${i}.srt`,
 		  lang: langcode,
@@ -349,9 +351,15 @@ async function fetchSubtitles(
   }
   async function checkHaveSub(lang,imdb){
 	let path = "subtitles/"+lang+"/"+imdb;
-	let files = await fs.readdir(path);
-	files = files.filter(file => file.includes("translated"))
-	  return files;
+	try {
+		let files = await fs.readdir(path);
+		files = files.filter(file => file.includes("translated"))
+		return files;
+	}catch (error){
+		console.log("chua sub")
+		return null;
+	}
+
   }
 function getIMDBID(id){
 	let imdbid = null;
