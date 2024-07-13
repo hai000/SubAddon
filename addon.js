@@ -329,7 +329,7 @@ async function fetchSubtitles(
 	  for (let i = 1; i <= count; i++) {
 		const subtitle = {
 		  id: `${imdbid}-subtitle-${i}`,
-		  url: `https://chiseled-boggy-chauffeur.glitch.me//subtitles/${oldisocode}/${imdbid}/${imdbid}-translated-${i}.srt`,
+		  url: `https://subaddon.onrender.com/subtitles/${oldisocode}/${imdbid}/${imdbid}-translated-${i}.srt`,
 		  lang: langcode,
 		};
 		subtitles.push(subtitle);
@@ -338,7 +338,7 @@ async function fetchSubtitles(
 	  for (let i = 1; i <= count; i++) {
 		const subtitle = {
 		  id: `${imdbid}-${season}-${episode}subtitle-${i}`,
-		  url: `https://chiseled-boggy-chauffeur.glitch.me/subtitles/${oldisocode}/${imdbid}/season${season}/${imdbid}-translated-${episode}-${i}.srt`,
+		  url: `https://subaddon.onrender.com/subtitles/${oldisocode}/${imdbid}/season${season}/${imdbid}-translated-${episode}-${i}.srt`,
 		  lang: langcode,
 		};
 		subtitles.push(subtitle);
