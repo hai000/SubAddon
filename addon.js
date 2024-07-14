@@ -524,36 +524,26 @@ var respond = function (res, data) {
 };
 async function translatebatch(subtitleBatch, apikey,oldisocode) {
 	let myObjectArray = subtitleBatch.map(text => ({ Text: text }));
-	const res = await fetch("https://libretranslate.com/translate", {
-		method: "POST",
-		body: JSON.stringify({
-			q: myObjectArray,
-			source: "en",
-			target: "vi"
-		}),
-		headers: { "Content-Type": "application/json" }
-	});
-	// const options = {
-	// 	method: 'POST',
-	// 	url: 'https://microsoft-translator-text.p.rapidapi.com/translate',
-	// 	params: {
-	// 		'to[0]': oldisocode,
-	// 		'api-version': '3.0',
-	// 		profanityAction: 'NoAction',
-	// 		textType: 'plain'
-	// 	},
-	// 	headers: {
-	// 		'Accept-Encoding': 'zlib',
-	// 		'content-type': 'application/json',
-	// 		'X-RapidAPI-Key': apikey,
-	// 		'X-RapidAPI-Host': 'microsoft-translator-text.p.rapidapi.com'
-	// 	},
-	// 	data: JSON.stringify(myObjectArray)
-	// };
+
+	const options = {
+		method: 'POST',
+		url: 'https://microsoft-translator-text.p.rapidapi.com/translate',
+		params: {
+			'to[0]': oldisocode,
+			'api-version': '3.0',
+			profanityAction: 'NoAction',
+			textType: 'plain'
+		},
+		headers: {
+			'Accept-Encoding': 'zlib',
+			'content-type': 'application/json',
+			'X-RapidAPI-Key': apikey,
+			'X-RapidAPI-Host': 'microsoft-translator-text.p.rapidapi.com'
+		},
+		data: JSON.stringify(myObjectArray)
+	};
 	try {
-		// const response = await axios.request(options);
-		const response = res;
-		console.log(res)
+		const response = await axios.request(options);
 		response.data.forEach(entry => {
 			const translatedText = entry.translations[0].text;
 			translatedSubtitle.push(translatedText);
