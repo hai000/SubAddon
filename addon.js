@@ -214,7 +214,7 @@ async function downloadSubtitles(subtitles,imdbid,season = null,episode = null,o
 			let fileO =await fs.readdir(extractPath)
 			const filePathO = `${extractPath}/${fileO[0]}`;
 			response = await fs.readFile(filePathO, 'utf8');
-		  console.log(response)
+		  // console.log(response)
 
 		  let filePath = null;
 		  if(episode)
