@@ -12,8 +12,10 @@
 	},
 	"dependencies": {
 		"axios": "^1.7.2",
+		"bing-translate-api": "^4.0.2",
 		"express": "^4.19.2",
+		"extract-zip-relative-path": "^2.0.4",
 		"stremio-addon-sdk": "1.6.10",
-		"unzip-stream": "^0.3.4"
+		"tunnel": "^0.0.6"
 	}
 }

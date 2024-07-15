@@ -1,17 +1,17 @@
 const { addonBuilder,serveHTTP} = require("stremio-addon-sdk")
-const apikey = require("./api");
+
 const languages = require("./languages.js");
 const axios = require('axios');
-const unzip = require('unzip-stream');
+const extract = require('extract-zip-relative-path')
 const fs = require('fs').promises;
-const path = require('path')
-const fsSynce = require('fs')
+const translater = require('./translate')
 const subsourcebaseurl = "https://subsource.net"
 var express = require("express")
 let subcounts = [];
 let timecodes = [];
 let texts = [];
 let translatedSubtitle = [];
+const domain = process.env.DOMAIN || 'http://127.0.0.1:55697';
 
 
 
@@ -33,12 +33,6 @@ const manifest = {
 			"type": "select",
 			"required": true,
 			"options": languages.getAllValues(),
-		  },
-		{
-			"key": "apikey",
-			"title": "RapidAPI Microsoft Translate API Key",
-			"type": "text",
-			"required": true,
 		  },
 	],
 	"catalogs": [],
@@ -62,11 +56,10 @@ builder.defineSubtitlesHandler(async function (args) {
 	let fileName = await checkHaveSub(oldisocode,imdbid);
 	const {type, season = null, episode = null } = parseId(id);
 	if(!(fileName)) {
-		const apikeyremaining = await apikey.checkapikey(config.apikey);
-		if(config.apikey != undefined&& apikeyremaining!== false){
 			if(imdbid !== null){// if imdbid is not null
 				const subs = await foundSubtitles(type, imdbid,season,episode,iso692);
 				// console.log("subs:" + subs)
+
 				if(subs!=null&&subs.length>0){// if not found subtitles with your language
 					if (
 						(await checkAndTranslatingAPI(
@@ -75,8 +68,6 @@ builder.defineSubtitlesHandler(async function (args) {
 							season,
 							episode,
 							oldisocode,
-							config.apikey,
-							apikeyremaining
 						))
 
 					) {
@@ -107,27 +98,22 @@ builder.defineSubtitlesHandler(async function (args) {
 
 
 				}else{
-					return Promise.resolve({ subtitles: [] });
+					const subtitle = {
+						id: `sub in subsource`,
+						url: `${domain}/subtitles/infomation/haveSubVi.srt`,
+						lang: iso692,
+					};
+					return Promise.resolve({ subtitles: [subtitle] });
 				}
-
-
 			}else {
 				console.log("Invalid id");
-				return Promise.resolve({ subtitles: [] });
+				const subtitle = {
+					id: `subaddon error`,
+					url: `${domain}/subtitles/infomation/onlySupportForIMDB.srt`,
+					lang: iso692,
+				};
+				return Promise.resolve({ subtitles: [subtitle] });
 			}
-
-		}else {
-			console.log("Invalid apikey: ", config.apikey);
-			let subtitles = [];
-			const subtitle = {
-				id: `Apikey error`,
-				url: `https://stremioaddon.sonsuzanime.com/subtitles/apikeyerror.srt`,
-				lang: iso692,
-			};
-			subtitles.push(subtitle);
-			console.log("Invalid apikey apikeyerror returned: ", subtitles);
-			return Promise.resolve({ subtitles: subtitles });
-		}
 	}else{
 		let subtitles = [];
 		let translatedsubs = await fetchSubtitles(imdbid,season,episode,1,type,iso692)
@@ -141,56 +127,12 @@ builder.defineSubtitlesHandler(async function (args) {
 })
 builder.constructor.name =  "AddonInterface"
 
-async function checkAndTranslatingAPI(subtitles, imdbid, season = null, episode = null, oldisocode, apikey, apikeyremaining) {
+async function checkAndTranslatingAPI(subtitles, imdbid, season = null, episode = null, oldisocode) {
 
 	let filepaths = await downloadSubtitles(subtitles, imdbid, season, episode, oldisocode);
-	let totalCharacterCount = 0;
-	for (let index = 0; index < filepaths.length; index++) {
-	  const originalSubtitleFilePath = filepaths[index];
-	  try {
-		const originalSubtitleContent = await fs.readFile(originalSubtitleFilePath, { encoding: 'utf-8' });
-		const lines = originalSubtitleContent.split('\n');
-		let iscount = true;
-		let istimecode = false;
-		let istext = false;
-		let characters = [];
-		let textcount = 0;
-		let count = 0;
-		for (let line of lines) {
-			count++;
-			if (line.trim() === '') {
-			  iscount = true;
-			  istimecode = false;
-			  istext = false;
-			  textcount = 0;
-			} else if (iscount === true) {
-			  iscount = false;
-			  istimecode = true;
-			} else if (istimecode === true) {
-			  istimecode = false;
-			  istext = true;
-			} else if (istext === true) {
-			  if (textcount === 0) {
-				characters.push(line);
-			  } else {
-				characters[characters.length - 1] += " \n"+ line;
-			  }
-			  textcount++;
-			}
-		}
-		characters.forEach(character => {
-		  totalCharacterCount += character.length;
-		});
-	  } catch (error) {
-		console.log("Check remaining api error", error.message);
-	  }
-	}
-  if (apikeyremaining > totalCharacterCount||true) {
-    main(imdbid, season, episode, oldisocode, apikey, filepaths);// call api to translate
+
+    main(imdbid, season, episode, oldisocode, filepaths);// call api to translate
     return true;
-  } else {
-    return false;
-  }
 }
 async function downloadSubtitles(subtitles,imdbid,season = null,episode = null,oldisocode) {
 	let uniqueTempFolder = null;
@@ -208,10 +150,11 @@ async function downloadSubtitles(subtitles,imdbid,season = null,episode = null,o
 			const zipFilePath = 'subtitles/temp/file.zip';
 			const extractPath = 'subtitles/origin';
 		  let response = await axios.get(url, { responseType: 'arraybuffer' });
-		  await fsSynce.writeFileSync(zipFilePath, response.data);
-		  await fsSynce.createReadStream(zipFilePath).pipe(unzip.Extract({ path: extractPath }))
+		  await fs.writeFile(zipFilePath, response.data);
+		  await extract(zipFilePath, { dir: extractPath })
 			console.log("giai nen sub success")
 			let fileO =await fs.readdir(extractPath)
+			console.log(fileO)
 			const filePathO = `${extractPath}/${fileO[0]}`;
 			response = await fs.readFile(filePathO, 'utf8');
 		  // console.log(response)
@@ -226,6 +169,7 @@ async function downloadSubtitles(subtitles,imdbid,season = null,episode = null,o
 		  }
 		  console.log(filePath);
 		  await fs.writeFile(filePath, response);
+		  await fs.rm(filePathO)
 		  console.log(`Subtitles downloaded and saved: ${filePath}`);
 		  filepaths.push(filePath);
 		} catch (error) {
@@ -267,7 +211,6 @@ async function foundSubtitles(type, imdbid,season,episode,iso692) {
 				 subtitles = response.data.subs
 					 .filter(subtitle => subtitle.lang === 'English')
 					 .map(subtitle => subtitle.subId);
-
 			 }
 			if(subtitles.length === 0){
 				lang = response.data.subs[0].lang
@@ -294,11 +237,11 @@ async function foundSubtitles(type, imdbid,season,episode,iso692) {
 		return null;
 	  }
 }
-async function main(imdbid, season = null, episode = null, oldisocode, apikey, filepaths) {
+async function main(imdbid, season = null, episode = null, oldisocode, filepaths) {
 	try {
 	  if (filepaths) {
 		try {
-		  await processsubtitles(filepaths, imdbid, season, episode, oldisocode, apikey);
+		  await processsubtitles(filepaths, imdbid, season, episode, oldisocode);
 		} catch (error) {
   
 		  console.error("Error on processing subtitles:", error.message);
@@ -325,12 +268,12 @@ async function fetchSubtitles(
 	if (oldisocode === undefined) {
 	  oldisocode = langcode;
 	}
-	//http://127.0.0.1:55697/
+
 	if (type === "movie") {
 	  for (let i = 1; i <= count; i++) {
 		const subtitle = {
-		  id: `${imdbid}-subtitle-${i}`,
-		  url: `https://subaddon.onrender.com/subtitles/${oldisocode}/${imdbid}/${imdbid}-translated-${i}.srt`,
+		  id: `subaddon ${imdbid}-subtitle-${i}`,
+		  url: `${domain}/subtitles/${oldisocode}/${imdbid}/${imdbid}-translated-${i}.srt`,
 		  lang: langcode,
 		};
 		subtitles.push(subtitle);
@@ -339,8 +282,8 @@ async function fetchSubtitles(
 	  for (let i = 1; i <= count; i++) {
 		const subtitle = {
 
-		  id: `${imdbid}-${season}-${episode}subtitle-${i}`,
-		  url: `https://subaddon.onrender.com/subtitles/${oldisocode}/${imdbid}/season${season}/${imdbid}-translated-${episode}-${i}.srt`,
+		  id: `subaddon ${imdbid}-${season}-${episode}subtitle-${i}`,
+		  url: `${domain}/subtitles/${oldisocode}/${imdbid}/season${season}/${imdbid}-translated-${episode}-${i}.srt`,
 		  lang: langcode,
 		};
 		subtitles.push(subtitle);
@@ -390,9 +333,10 @@ function parseId(id) {
 	  return { type: "unknown", season: 0, episode: 0 };
 	}
   }
-  async function processsubtitles(filepath, imdbid, season = null, episode = null,oldisocode,apikey) {
+  async function processsubtitles(filepath, imdbid, season = null, episode = null,oldisocode) {
 	for (let index = 0; index < filepath.length; index++) {
 	  const originalSubtitleFilePath = filepath[index];
+	  let countTranslate = 0;
 	  try {
 		const originalSubtitleContent = await fs.readFile(originalSubtitleFilePath, { encoding: 'utf-8' });
 		const lines = originalSubtitleContent.split('\n');
@@ -413,7 +357,12 @@ function parseId(id) {
 			subtitleBatch.push(texts[texts.length - 1]);
 			if (subtitleBatch.length === batchSize) {
 			  try {
-				await translatebatch(subtitleBatch, apikey,oldisocode);
+				  if (countTranslate % 2 === 0 && countTranslate !== 0) {
+					  console.log("sleep 2s")
+					  await new Promise(resolve => setTimeout(resolve, 2000));
+				  }
+				await translatebatch(subtitleBatch,oldisocode);
+				countTranslate++
 				subtitleBatch = [];
 			  } catch (error) {
 				console.error("Translate batch error: ",error);
@@ -444,8 +393,13 @@ function parseId(id) {
 		}
 		if (subtitleBatch.length !== 0) {
 		  try {
+			  if (countTranslate % 2 === 0 && countTranslate !== 0) {
+
+				  await new Promise(resolve => setTimeout(resolve, 2000));
+			  }
 			subtitleBatch.push(texts[texts.length - 1]);
-			await translatebatch(subtitleBatch, apikey,oldisocode);
+			countTranslate++
+			await translatebatch(subtitleBatch,oldisocode);
 			subtitleBatch = [];
 		  } catch (error) {
 			console.log("Subtitle batch error: ",error);
@@ -459,11 +413,9 @@ function parseId(id) {
 		}
 		try {
 		  let currentCount = 0;
-			currentCount = index + 1;
-		  console.log("Current count: " + currentCount);
+		  currentCount = index + 1;
 		  if (currentCount !== 0) {
 			await savetranslatedsubs(currentCount, imdbid, season, episode, oldisocode);
-			console.log("current count: " + currentCount);
 		  }
 		} catch (error) {
 		  console.error("Translate batch error: ",error);
@@ -522,32 +474,18 @@ var respond = function (res, data) {
 		}
 	});
 };
-async function translatebatch(subtitleBatch, apikey,oldisocode) {
-	let myObjectArray = subtitleBatch.map(text => ({ Text: text }));
+async function translatebatch(subtitleBatch,oldisocode) {
+	let myObjectArray = subtitleBatch;
 
-	const options = {
-		method: 'POST',
-		url: 'https://microsoft-translator-text.p.rapidapi.com/translate',
-		params: {
-			'to[0]': oldisocode,
-			'api-version': '3.0',
-			profanityAction: 'NoAction',
-			textType: 'plain'
-		},
-		headers: {
-			'Accept-Encoding': 'zlib',
-			'content-type': 'application/json',
-			'X-RapidAPI-Key': apikey,
-			'X-RapidAPI-Host': 'microsoft-translator-text.p.rapidapi.com'
-		},
-		data: JSON.stringify(myObjectArray)
-	};
 	try {
-		const response = await axios.request(options);
-		response.data.forEach(entry => {
-			const translatedText = entry.translations[0].text;
-			translatedSubtitle.push(translatedText);
-		});
+
+		let response = await translater(myObjectArray,'en',oldisocode)
+		// response = response.split(',')
+		response.forEach(text => translatedSubtitle.push(text))
+		// response.data.forEach(entry => {
+		// 	const translatedText = entry.translations[0].text;
+		// 	translatedSubtitle.push(translatedText);
+		// });
 		console.log("Batch translated");
 	} catch (error)  {
 		console.error("Batch translate error:", error.message);
